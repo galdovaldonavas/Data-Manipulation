@@ -1,0 +1,204 @@
+---
+title: "R Notes for Data Manipulation"
+output: html_notebook
+---
+
+
+1. SET UP
+
+First we load libraries that we will need
+```{r}
+library(dplyr) # for data manipulation functions.
+library(psych) # for enhanced descriptives and analyses.
+library(readxl) # for loading databases from excel.
+library(openxlsx) # for saving databases in excel.
+library(car) # to explore pair scatterplot matrices, variable distributions,  box-cox transformations
+library(corrplot)# for getting graphs of correlation matrixes
+```
+
+
+
+
+Then we load the database. We typically do it through a csv file or an excel file: ´
+
+```{r}
+# for csv files
+original_data<-read.csv("Database Practica Large csv.csv")
+
+# for excel files, using the readxl package
+original_data <- read.xlsx("Database Practica Large.xlsx")
+```
+
+
+I like to keep the data I work with in a different object separated to the original data, so I can use the original data for reference as I advance in the data manipulation. For that, we can create the object for the datafile I will be working with: 
+
+```{r}
+data<- original_data
+
+```
+
+
+
+2. INITIAL DATA EXPLORATION: DESCRIPTIVE INFORMATION FOR EACH VARIABLE
+
+This will help you identify important aspects, like the variables where you have missing data, whether you have responses to all levels in your factor variables (e.g., responses for both men and woman), if the distribution of responses is according to expectations...in the end, it will help you define how you want to manipulate the data in further steps (see section 4). 
+
+2.1. We can use *summary()* to see main descriptives of the variables: 
+- mean, median, quartiles and range for numeric variables; 
+- frequencies for factors;
+- * if variables are coded as character, we will not get information (see section 3 for coding them as factors or numeric variables as needed)
+
+```{r}
+summary(data)
+```
+2.2. We can use *describe* (from the psych package) to see more quantitative descriptives across all variables, including the mean, sd, se, kurtosis, skewness...R will do it across all variables, including those coded as factors and characters. In these cases, the name of these variables will be marked with *
+
+
+```{r}
+describe(data)
+```
+
+
+
+2.3. We can also see the structure of our dataset with *str()*, including the number of cases (lines), the number of variables (columns), and how the variables are coded
+
+```{r}
+str(data)
+
+#in case we are only interested in the number of cases and columns we can just use dim():
+
+dim(data)
+```
+
+
+2.4. IMPORTANT NOTE ABOUT INDEXING
+
+Please note that we can run these functions only for a set of variables. We will just have to index those variables. I will show several ways for indexing variables, using the describe() function: 
+
+- Indicating the position of the variables using *[,]* in our dataset object. Within the brackets, the first term before the comma refers to the position of the lines, the second term after the comma to the position of the columns. So...if we wanted to se the descriptives for the variable that appears the third in our dataset, that is, the third column, we will use this code: 
+
+```{r}
+describe(data[,3])
+```
+
+We can also index a group of variables using this structure, using *c(,,)* to enumerate which ones. For example, if we wanted to obtain the descriptives for the variables that appear in the 3rd,7th, 8th, and 9th columns, we can use: 
+
+
+```{r}
+describe(data[,c(3,7,8,9)])
+```
+In case we are interested in a set of variables that appear together in the dataset, we can use *:* to indicate from which column to which column we are interested. We can tell R that we want the variables corresponding from the 7th column to the 9th column with 7:9. For example, for the same selection described above (the 3rd,7th, 8th, and 9th columns), we can use: 
+
+```{r}
+
+describe(data[,c(3,7:9)])
+
+```
+
+We could also index their variables with their names, using quotes("") for each variable name. For example, for the same selection (which correspond to the variables age, sat1, sat2 and sat3), we could use:  
+
+```{r}
+
+describe(data[, c("age", "sat1", "sat2", "sat3")])
+
+
+```
+
+
+We could also index the variables by indicating their name after the database and the *$* connector. For example, for obtaining the descriptives of the variable age
+
+```{r}
+describe(data$age)
+```
+
+
+2.5. SELECTIONS AS AN ALTERNATIVE FOR INDEXING
+
+The function *select*, from the dplyr package, allow us to do selections of variables, which in many cases is used in similar ways to indexing. Also, it allow us to indicate the variables, such as using : with variable names to indicate from which variable to which variable in the dataset we want to select (similarly to explain earlier, but now with variable names). In the select function we first indicate the dataset, then the variables we are interested in selecting. 
+
+For example to obtain the descriptives of the group of variables indexed earlier, the 3rd, 7th, 8th, and 9th variable, which correspond to variables age, sat1, sat2 and sat3, we can use: 
+
+```{r}
+describe(select(data, c(age, sat1:sat3)))
+
+#or alternatively, we no longer need to group the variables with c(). We can just list them after the dataset name. 
+
+describe(select(data, age, sat1:sat3))
+
+```
+
+
+
+
+
+3.DEFINING THE TYPE OF VARIABLES
+
+This step is important for some functions to run as expected, even for some of the initial explorations we described in the prior step. So you might need to run again the prior explorations with the corrected variable format. 
+
+As we have seen in the prior outputs from str() and describe(), we had several variables coded as characters that are suppossed to be factors. 
+
+3.1. We can transform them to factors, using the *factor()* function
+
+```{r}
+
+data$gender <- factor(data$gender)
+data$condition <- factor(data$condition)
+data$app <- factor(data$app)
+data$Country <- factor(data$Country)
+#(...)
+
+#alternatively, we could simplify the code by using the lapply() function and specific indexes by their position in the dataframe
+
+data[, c(2,4:6, 11:13)] <- lapply(data[, c(2,4:6, 11:13)], factor)
+
+# or by indexing them with their names
+data[, c("gender", "condition", "app", "Country", "method", "reason", "country")] <- lapply(data[, c("gender", "condition", "app", "Country", "method", "reason", "country")], factor)
+
+# We check that the transformations have been done as expected: 
+str(data)
+
+```
+
+
+
+
+4. SECONDARY DATA EXPLORATION: BIVARIATE CORRELATIONS AND DISTRIBUTION SHAPES
+
+Exploring the shape of the variables' distributions is of great importance for the consideration of further transformations in the variables or the considerations or robust analyses that do not need to fulfill shape assumptions like normality. 
+
+Additionally, the exploration of bivariate correlations can help us to anticipate collinearity problems in regression models. 
+
+
+4.1. With the function *scatterplotMatrix()*, we can obtain a matrix that show scatterplots for the bivariate correlations in our dataset, as well as histograms to see the variable distributions. 
+
+We will do it by selecting the numeric variables in our dataset: 
+
+
+```{r}
+scatterplotMatrix(data[, c(3, 7:10)])
+```
+
+4.2. We can also see the specific Pearson correlations with a correlation matrix
+
+```{r}
+cor(data[, c(3, 7:10)], use="complete.obs")
+```
+
+4.3. We can also see the correlation matrix in a more graphical way, using corrplotmixed()
+
+```{r}
+corrplot.mixed(corr = cor(data[, c(3, 7:10)], use="complete.obs",), upper= "ellipse")
+```
+
+3.4. If we are interested in exploring qualitative variables, we might be interested in checking the intercorrelation of our predictors. For example, if we want to see app and condition: 
+
+```{r}
+table<-with(data, table(app, condition))
+table
+prop.table(table, margin=2)
+
+
+
+```
+
+###Pending: incluir data merges en sección 2

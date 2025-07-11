@@ -201,4 +201,4 @@ prop.table(table, margin=2)
 
 ```
 
-###Pending: incluir data merges en sección 2
+###Pending: incluir data merges en sección 2, and arrange functions
